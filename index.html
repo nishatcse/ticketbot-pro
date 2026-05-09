@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicketBot Pro - Multi-Threaded Fleet</title>
+    <style>
+        body { background-color: #121212; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px;}
+        .header h2 { color: #03dac6; margin: 0; }
+        .instructions { background-color: #1e1e1e; border-left: 4px solid #bb86fc; padding: 10px; font-size: 13px; margin-bottom: 20px; color: #ccc; }
+        
+        /* Grid for multiple accounts */
+        #accounts-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px; overflow-y: auto; max-height: 40vh; padding-right: 10px; }
+        .account-card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 6px; padding: 15px; position: relative; }
+        .remove-btn { position: absolute; top: 10px; right: 10px; background: red; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; padding: 2px 6px; }
+        
+        .form-group { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: bold; color: #aaa; }
+        input { width: 100%; padding: 8px; background-color: #2c2c2c; border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; font-size: 13px; }
+        input:focus { outline: none; border-color: #03dac6; }
+        
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        button.action-btn { flex: 1; padding: 12px; background-color: #bb86fc; color: #000; border: none; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; }
+        button.action-btn:hover { background-color: #9965f4; }
+        button.action-btn:disabled { background-color: #555; cursor: not-allowed; }
+        button.add-btn { flex: 0.3; background-color: #03dac6; }
+        button.add-btn:hover { background-color: #01bca9; }
+
+        .terminal-wrapper { flex-grow: 1; display: flex; flex-direction: column; }
+        #terminal { flex-grow: 1; background-color: #000; color: #00ff00; font-family: monospace; padding: 10px; border-radius: 4px; overflow-y: auto; border: 1px solid #333; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>TicketBot Pro - Fleet Control</h2>
+    </div>
+
+    <div class="instructions">
+        <strong>⚠️ Multi-Browser Setup:</strong> You must open a separate Chrome instance for each account before starting.<br>
+        Port 9222: <code>"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome_profile_1"</code><br>
+        Port 9223: <code>"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9223 --user-data-dir="C:\chrome_profile_2"</code>
+        <!-- for mac -->
+        <!-- <br> <strong>For mac</strong> <br>
+        Port 9222: <code>open -n -a "Google Chrome" --args --remote-debugging-port=9222 --user-data-dir="$HOME/chrome_profile_1"</code> <br>
+        Port 9223: <code>open -n -a "Google Chrome" --args --remote-debugging-port=9223 --user-data-dir="$HOME/chrome_profile_2"</code> -->
+    </div>
+
+    <!-- Container where dynamic accounts will appear -->
+    <div id="accounts-container"></div>
+
+    <div class="controls">
+        <button class="action-btn add-btn" id="addAccountBtn">+ Add Account</button>
+        <button class="action-btn" id="startAllBtn">🚀 START ALL BOTS</button>
+        <button class="action-btn" id="clearLogsBtn" style="background-color: #ff9800; flex: 0.3;">🗑️ Clear Logs</button>
+        <button class="action-btn" id="restartBtn" style="background-color: #f44336; flex: 0.3; color: white;">🔄 Restart</button>
+    </div>
+
+    <div class="terminal-wrapper">
+        <label style="color: #fff; font-size: 14px;">Global System Logs:</label>
+        <div id="terminal">System Ready... Waiting for input.<br></div>
+    </div>
+
+    <script>
+        const container = document.getElementById('accounts-container');
+        const startBtn = document.getElementById('startAllBtn');
+        const clearLogsBtn = document.getElementById('clearLogsBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const terminal = document.getElementById('terminal');
+        let accountCounter = 0;
+
+        function logToTerminal(message) {
+            terminal.innerHTML += `> ${message}<br>`;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Function to create a new Account Card UI (Same as previous)
+        function createAccountCard() {
+            accountCounter++;
+            const currentPort = 9221 + accountCounter; 
+            
+            const card = document.createElement('div');
+            card.className = 'account-card';
+            card.id = `account-${accountCounter}`;
+            
+            card.innerHTML = `
+                <button class="remove-btn" onclick="this.parentElement.remove()">X</button>
+                <div style="color: #03dac6; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 5px;">Account ${accountCounter}</div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Chrome Port</label>
+                        <input type="text" class="inp-port" value="${currentPort}">
+                    </div>
+                    <div class="form-group" style="flex: 2;">
+                        <label>Target URL</label>
+                        <input type="text" class="inp-url" placeholder="https://..." value="">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Target Train (Exact Text)</label>
+                    <input type="text" class="inp-train" value="TISTA EXPRESS (707)">
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Seat Class</label>
+                        <input type="text" class="inp-class" value="S_CHAIR">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Seat Count</label>
+                        <input type="number" class="inp-seats" value="1" min="1" max="4">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Bot Mode</label>
+                        <select class="inp-mode" style="width: 100%; padding: 8px; background-color: #2c2c2c; border: 1px solid #444; color: #fff; border-radius: 4px;">
+                            <option value="Test">Test Mode (Check)</option>
+                            <option value="Live">Live Mode (Click!)</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        }
+
+        createAccountCard();
+        document.getElementById('addAccountBtn').addEventListener('click', createAccountCard);
+
+        // CLEAR LOGS FUNCTIONALITY
+        clearLogsBtn.addEventListener('click', () => {
+            terminal.innerHTML = 'Logs cleared.<br>';
+        });
+
+        // RESTART UI FUNCTIONALITY
+        restartBtn.addEventListener('click', () => {
+            container.innerHTML = '';
+            accountCounter = 0;
+            createAccountCard();
+            logToTerminal("<span style='color:orange;'>System UI reset. All tasks aborted.</span>");
+            startBtn.disabled = false;
+            document.getElementById('addAccountBtn').disabled = false;
+            startBtn.innerText = "🚀 START ALL BOTS";
+            // Inform the backend to kill active processes
+            window.electronAPI.restartSystem();
+        });
+
+        startBtn.addEventListener('click', () => {
+            const cards = document.querySelectorAll('.account-card');
+            const configs = [];
+
+            cards.forEach(card => {
+                const url = card.querySelector('.inp-url').value;
+                if(url) {
+                    configs.push({
+                        id: card.id,
+                        port: card.querySelector('.inp-port').value,
+                        url: url,
+                        trainName: card.querySelector('.inp-train').value,
+                        seatClass: card.querySelector('.inp-class').value,
+                        seats: parseInt(card.querySelector('.inp-seats').value),
+                        mode: card.querySelector('.inp-mode').value
+                    });
+                }
+            });
+
+            if(configs.length === 0) return;
+
+            startBtn.disabled = true;
+            document.getElementById('addAccountBtn').disabled = true;
+            startBtn.innerText = "BOTS ARE RUNNING...";
+            logToTerminal(`Initiating fleet sequence for ${configs.length} accounts...`);
+
+            window.electronAPI.startAllBots(configs);
+        });
+
+        window.electronAPI.onBotLog((message) => { logToTerminal(message); });
+
+        window.electronAPI.onBotFinish((message) => {
+            logToTerminal(`<span style='color:#03dac6; font-weight: bold;'>${message}</span>`);
+            startBtn.disabled = false;
+            document.getElementById('addAccountBtn').disabled = false;
+            startBtn.innerText = "🚀 START ALL BOTS";
+        });
+    </script>
+</body>
+</html>
