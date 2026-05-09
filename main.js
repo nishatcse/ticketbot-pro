@@ -1,7 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const runBot = require('./bot'); 
+// const runBot = require('./bot'); 
+const { fork } = require('child_process'); // NEW: For Multi-Processing
 const { machineIdSync } = require('node-machine-id'); // NEW: For Hardware ID
 const axios = require('axios'); // NEW: For API requests
 
@@ -89,42 +90,55 @@ ipcMain.on('verify-license', async (event, key) => {
     }
 });
 
-// --- EXISTING RESTART LOGIC ---
+// GLOBAL STATE MANAGER FOR WORKERS
+let activeWorkers = []; 
+
+// --- UPGRADED RESTART LOGIC ---
 ipcMain.on('restart-system', () => {
     globalSnipedTrains = {}; 
-    abortControllers.forEach(controller => controller.abort()); 
-    abortControllers = [];
+    
+    // Kill all background processes instantly
+    activeWorkers.forEach(worker => {
+        worker.send({ type: 'ABORT' });
+        worker.kill(); 
+    });
+    activeWorkers = [];
 });
 
-// --- EXISTING BOT FLEET LOGIC ---
-ipcMain.on('start-all-bots', async (event, configs) => {
-    abortControllers = [];
+// --- UPGRADED MULTI-PROCESS BOT FLEET LOGIC ---
+ipcMain.on('start-all-bots', (event, configs) => {
+    activeWorkers = [];
+    let finishedCount = 0;
 
-    try {
-        const botTasks = configs.map(config => {
-            const controller = new AbortController();
-            abortControllers.push(controller);
-            
-            const customSendLog = (message) => {
-                event.reply('bot-log', `[Port ${config.port}] ${message}`);
-            };
+    if (configs.length === 0) return;
 
-            return runBot(config, customSendLog, controller.signal);
-        });
+    // FIX: Added 'index' right here 👇
+    configs.forEach((config, index) => {
+        // FORK: Creates a completely new, invisible Node.js process for EACH Chrome browser
+        const worker = fork(path.join(__dirname, 'botWorker.js'));
+        activeWorkers.push(worker);
 
-        const results = await Promise.allSettled(botTasks);
-
-        let failures = 0;
-        results.forEach((res, index) => {
-            if(res.status === 'rejected' && res.reason.name !== 'AbortError') {
-                failures++;
-                event.reply('bot-log', `[Port ${configs[index].port}] <span style='color:red;'>Failed: ${res.reason.message}</span>`);
+        // Listen for messages coming back from this specific worker
+        worker.on('message', (msg) => {
+            if (msg.type === 'LOG') {
+                event.reply('bot-log', `[Port ${msg.port}] ${msg.message}`);
+            } else if (msg.type === 'DONE' || msg.type === 'ERROR') {
+                if (msg.type === 'ERROR') {
+                    event.reply('bot-log', `[Port ${msg.port}] <span style='color:red;'>Failed: ${msg.message}</span>`);
+                }
+                
+                finishedCount++;
+                // If all workers have finished their jobs, notify the UI
+                if (finishedCount === configs.length) {
+                    event.reply('bot-finish', "Fleet sequence concluded.");
+                }
             }
         });
 
-        event.reply('bot-finish', "Fleet sequence concluded.");
-    } catch (error) {
-        event.reply('bot-log', `<span style='color:red;'>System Error: ${error.message}</span>`);
-        event.reply('bot-finish', "Fleet sequence halted due to critical error.");
-    }
+        // Bot 1 starts at 0ms, Bot 2 at 300ms, Bot 3 at 600ms, etc.
+        // Now 'index' will correctly be 0, 1, 2, 3...
+        setTimeout(() => {
+            worker.send({ type: 'START', config: config });
+        }, index * 300);
+    });
 });

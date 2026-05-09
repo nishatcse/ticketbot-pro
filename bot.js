@@ -89,53 +89,112 @@ module.exports = async function runBot(config, sendLog, abortSignal) {
             return available;
         });
 
-        // --- NEW: BOGIE RANDOMIZATION ---
-        // Shuffle the bogies so 10 bots don't all attack Bogie "KA" at the same time
+        // --- SMART BOGIE SORTING ---
+        // 1. If user wants a specific bogie, find it and pull it out
+        let preferredBogieIndex = -1;
+        let preferredBogie = null;
+        
+        if (config.targetBogie) {
+            preferredBogieIndex = validBogies.findIndex(b => b.text.toUpperCase().includes(config.targetBogie));
+            if (preferredBogieIndex !== -1) {
+                preferredBogie = validBogies.splice(preferredBogieIndex, 1)[0];
+            }
+        }
+
+        // 2. Shuffle the REMAINING bogies to prevent collisions with other bots
         for (let i = validBogies.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [validBogies[i], validBogies[j]] = [validBogies[j], validBogies[i]];
         }
 
-        sendLog(`Found ${validBogies.length} valid bogies. Attacking randomly.`);
+        // 3. Put the preferred bogie at the absolute front of the line (if found)
+        if (preferredBogie) {
+            validBogies.unshift(preferredBogie);
+            sendLog(`🎯 Target Bogie found: Pushing ${preferredBogie.text} to priority queue.`);
+        }
 
+        sendLog(`Attacking ${validBogies.length} available bogies...`);
+
+        // --- THE HUNTING LOOP ---
         for (let bogie of validBogies) {
-            if (totalSeatsClicked >= config.seats) break;
+            if (totalSeatsClicked >= config.seats) break; // Quota full! Stop hunting.
 
-            sendLog(`Selecting Bogie: ${bogie.text}`);
+            sendLog(`Entering Bogie: ${bogie.text}`);
             await activeTab.select('#select-bogie', bogie.value);
-            await new Promise(r => setTimeout(r, 1500)); 
+            await new Promise(r => setTimeout(r, 1500)); // Wait for seats to load in DOM
 
-            // --- SEAT RANDOMIZATION ---
-            const shuffledSeatIndices = await activeTab.evaluate(() => {
+            // Grab all currently available seats and their EXACT titles (e.g., SCHA-1)
+            let availableSeatsInfo = await activeTab.evaluate(() => {
                 const seats = document.querySelectorAll('.seat-available');
-                let indices = Array.from({length: seats.length}, (_, i) => i);
-                for (let i = indices.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [indices[i], indices[j]] = [indices[j], indices[i]];
-                }
-                return indices;
+                return Array.from(seats).map((seat, index) => ({
+                    title: seat.getAttribute('title') || '',
+                    index: index
+                }));
             });
 
-            for (let targetIndex of shuffledSeatIndices) {
-                if (totalSeatsClicked >= config.seats) break; 
-
-                // ACTUAL FINAL CLICK
-                await activeTab.evaluate((seatIndex) => {
-                    document.querySelectorAll('.seat-available')[seatIndex].click();
-                }, targetIndex);
-
-                totalSeatsClicked++; 
-                sendLog(`<span style='color:#bb86fc;'>✅ Selected seat ${totalSeatsClicked}/${config.seats}</span>`);
-                await new Promise(r => setTimeout(r, 400)); 
+            if (availableSeatsInfo.length === 0) {
+                sendLog(`<span style='color:gray;'>Bogie empty or locked. Moving to next...</span>`);
+                continue; 
             }
+
+            // --- PLAN A: TARGETED SEAT SNIPING ---
+            if (config.targetSeatNames && config.targetSeatNames.length > 0) {
+                for (let targetName of config.targetSeatNames) {
+                    if (totalSeatsClicked >= config.seats) break;
+                    
+                    let seatMatch = availableSeatsInfo.find(s => s.title.toUpperCase() === targetName);
+                    
+                    if (seatMatch && !seatMatch.clicked) {
+                        // Click the specific seat!
+                        await activeTab.evaluate((idx) => { 
+                            document.querySelectorAll('.seat-available')[idx].click(); 
+                        }, seatMatch.index);
+                        
+                        seatMatch.clicked = true; // Mark as taken locally
+                        totalSeatsClicked++; 
+                        sendLog(`<span style='color:#00ff00; font-weight:bold;'>🎯 VIP SNIPE: Secured exact seat [${targetName}] (${totalSeatsClicked}/${config.seats})</span>`);
+                        await new Promise(r => setTimeout(r, 400)); 
+                    }
+                }
+            }
+
+            // --- PLAN B: RANDOMIZED FALLBACK ---
+            // If the user didn't specify seats, OR if the targeted seats were already taken by someone else
+            if (totalSeatsClicked < config.seats) {
+                let remainingSeats = availableSeatsInfo.filter(s => !s.clicked);
+                
+                if (remainingSeats.length > 0) {
+                    sendLog(`Need ${config.seats - totalSeatsClicked} more seats. Triggering Random Fallback...`);
+                    
+                    // Shuffle the remaining seats to prevent collision
+                    for (let i = remainingSeats.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [remainingSeats[i], remainingSeats[j]] = [remainingSeats[j], remainingSeats[i]];
+                    }
+
+                    for (let randomSeat of remainingSeats) {
+                        if (totalSeatsClicked >= config.seats) break;
+                        
+                        await activeTab.evaluate((idx) => { 
+                            document.querySelectorAll('.seat-available')[idx].click(); 
+                        }, randomSeat.index);
+                        
+                        totalSeatsClicked++;
+                        sendLog(`<span style='color:#bb86fc;'>✅ Random Grab: Secured [${randomSeat.title}] (${totalSeatsClicked}/${config.seats})</span>`);
+                        await new Promise(r => setTimeout(r, 400));
+                    }
+                }
+            }
+            
+            // NOTE: If totalSeatsClicked is still < config.seats, the loop naturally continues to the next Bogie!
         }
         
         if (totalSeatsClicked === 0) {
-            sendLog("<span style='color:orange;'>⚠️ Tickets sold out while processing.</span>");
+            sendLog("<span style='color:red; font-weight:bold;'>⚠️ FAILED: All targeted and random seats sold out while processing.</span>");
         } else if (totalSeatsClicked < config.seats) {
-            sendLog(`<span style='color:yellow;'>⚠️ PARTIAL BOOKING: Found ${totalSeatsClicked} out of ${config.seats}. Proceed manually!</span>`);
+            sendLog(`<span style='color:yellow; font-weight:bold;'>⚠️ PARTIAL BOOKING: Only secured ${totalSeatsClicked} out of ${config.seats}. Proceed manually!</span>`);
         } else {
-            sendLog("<span style='color:#00ff00;'>✅ 100% Success. Proceed to checkout manually!</span>");
+            sendLog("<span style='color:#00ff00; font-weight:bold;'>✅ 100% SUCCESS. Proceed to checkout manually!</span>");
         }
 
         browser.disconnect();
