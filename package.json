@@ -1,6 +1,6 @@
 {
   "name": "ticketbot-pro",
-  "version": "1.1.0",
+  "version": "2.2.2",
   "description": "Multi-Account Ticketing Control Panel",
   "author": "Nur Hossain",
   "main": "main.js",
@@ -18,8 +18,8 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.nurhossain.ticketbotpro",
-    "productName": "TicketBot Pro",
+    "appId": "com.nurhossain.ticketbotapipro",
+    "productName": "TicketBot API Pro",
     "directories": {
       "output": "dist"
     },

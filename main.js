@@ -142,3 +142,70 @@ ipcMain.on('start-all-bots', (event, configs) => {
         }, index * 300);
     });
 });
+
+
+
+// ==========================================
+// 🚀 NEW: THE API TERMINATOR FLEET LOGIC
+// ==========================================
+
+// Map to store API workers by their Port number (Allows targeted OTP and Stop commands)
+const apiWorkers = new Map();
+
+ipcMain.on('start-api-node', (event, config) => {
+    const port = parseInt(config.port);
+
+    // If there's already a worker running on this port, kill it first
+    if (apiWorkers.has(port)) {
+        const oldWorker = apiWorkers.get(port);
+        oldWorker.send({ type: 'ABORT' });
+        oldWorker.kill();
+        apiWorkers.delete(port);
+    }
+
+    // Fork the new background worker
+    const worker = fork(path.join(__dirname, 'apiWorker.js'));
+    apiWorkers.set(port, worker);
+
+    // Listen for messages from THIS specific worker
+    worker.on('message', (msg) => {
+        if (msg.type === 'LOG') {
+            event.reply('api-log', { port: msg.port, message: msg.message });
+        } 
+        else if (msg.type === 'NEED_OTP') {
+            // Signal the UI to show the OTP Box for this specific port
+            event.reply('need-otp', msg.port);
+        } 
+        else if (msg.type === 'DONE' || msg.type === 'ERROR') {
+            if (msg.type === 'ERROR') {
+                event.reply('api-log', { port: msg.port, message: `<span style='color:#cf6679;'>❌ Failed: ${msg.message}</span>` });
+            }
+            // Remove from active map when done
+            apiWorkers.delete(msg.port);
+        }
+    });
+
+    // Start the bot
+    worker.send({ type: 'START', config: config });
+});
+
+// Target and kill a specific bot
+ipcMain.on('stop-api-node', (event, port) => {
+    const portNum = parseInt(port);
+    if (apiWorkers.has(portNum)) {
+        const worker = apiWorkers.get(portNum);
+        worker.send({ type: 'ABORT' });
+        worker.kill();
+        apiWorkers.delete(portNum);
+        event.reply('api-log', { port: portNum, message: `<span style='color:#cf6679;'>🛑 Process aborted manually.</span>` });
+    }
+});
+
+// Route the OTP to the correct background worker
+ipcMain.on('submit-otp', (event, port, otpCode) => {
+    const portNum = parseInt(port);
+    if (apiWorkers.has(portNum)) {
+        const worker = apiWorkers.get(portNum);
+        worker.send({ type: 'SUBMIT_OTP', otpCode: otpCode });
+    }
+});

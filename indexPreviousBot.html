@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicketBot Pro - Multi-Threaded Fleet</title>
+    <style>
+        /* Base Styling & Scrollbars */
+        body { 
+            background-color: #0d0d0d; 
+            color: #e0e0e0; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 15px; 
+            height: 100vh; 
+            box-sizing: border-box; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; /* Prevents whole-page scrolling */
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #03dac6; }
+
+        /* Header & Instructions */
+        .header { text-align: center; margin-bottom: 15px; }
+        .header h2 { color: #03dac6; margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+        .instructions { 
+            background-color: #1a1a1a; border-left: 4px solid #bb86fc; padding: 10px 15px; 
+            font-size: 12px; margin-bottom: 15px; color: #aaa; border-radius: 0 4px 4px 0;
+            display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
+        }
+
+        /* --- DASHBOARD LAYOUT (The Magic) --- */
+        .dashboard-container {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        /* Left Panel: Accounts */
+        .left-panel {
+            flex: 1.5; /* Takes up slightly more space */
+            display: flex;
+            flex-direction: column;
+            background: #121212;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            overflow: hidden;
+        }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .panel-header h3 { margin: 0; color: #fff; font-size: 16px; }
+
+        #accounts-container { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); 
+            gap: 15px; 
+            overflow-y: auto; 
+            flex-grow: 1;
+            padding-right: 5px;
+        }
+
+        /* Right Panel: Controls & Terminal */
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow: hidden;
+        }
+
+        /* Account Card Styling */
+        .account-card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 8px; padding: 15px; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: border-color 0.2s; }
+        .account-card:hover { border-color: #03dac6; }
+        .remove-btn { position: absolute; top: 12px; right: 12px; background: #cf6679; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 4px 8px; font-weight: bold; }
+        .remove-btn:hover { background: #ff4c4c; }
+        
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 4px; font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; }
+        input, select { width: 100%; padding: 8px 10px; background-color: #252525; border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; font-size: 13px; transition: 0.2s; }
+        input:focus, select:focus { outline: none; border-color: #03dac6; background-color: #2a2a2a; }
+        
+        /* Sniper Timer Panel */
+        .timer-panel {
+            background: linear-gradient(145deg, #1e1e1e, #1a1a1a);
+            padding: 15px; border-radius: 8px; border: 1px solid #ff9800; 
+            display: flex; flex-direction: column; gap: 10px;
+            box-shadow: 0 0 15px rgba(255, 152, 0, 0.1);
+        }
+        .timer-row { display: flex; gap: 15px; align-items: center; }
+
+        /* Buttons */
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; }
+        button.action-btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
+        button.action-btn:disabled { background-color: #444 !important; color: #888 !important; cursor: not-allowed; transform: none; }
+        button.action-btn:active:not(:disabled) { transform: scale(0.98); }
+        
+        #startAllBtn { background-color: #bb86fc; color: #000; flex-basis: 100%; font-size: 16px; padding: 15px; box-shadow: 0 4px 10px rgba(187, 134, 252, 0.2); }
+        #startAllBtn:hover:not(:disabled) { background-color: #d0a8ff; box-shadow: 0 4px 15px rgba(187, 134, 252, 0.4); }
+        
+        #addAccountBtn { background-color: #03dac6; color: #000; padding: 6px 12px; font-size: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        #addAccountBtn:hover { background-color: #01bca9; }
+        
+        #clearLogsBtn { background-color: #2d2d2d; color: #fff; border: 1px solid #555; }
+        #clearLogsBtn:hover { background-color: #444; }
+        
+        #restartBtn { background-color: #cf6679; color: #fff; }
+        #restartBtn:hover { background-color: #ff4c4c; }
+
+        /* Terminal */
+        .terminal-wrapper { flex-grow: 1; display: flex; flex-direction: column; background: #000; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+        .terminal-header { background: #1a1a1a; padding: 8px 15px; font-size: 12px; font-weight: bold; color: #888; border-bottom: 1px solid #333; }
+        #terminal { flex-grow: 1; background-color: transparent; color: #00ff00; font-family: 'Consolas', monospace; padding: 15px; overflow-y: auto; font-size: 13px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>TicketBot Pro - Command Center</h2>
+    </div>
+
+    <div class="instructions">
+        <p><strong>⚠️ Multi-Browser Setup:</strong> You must open a separate Chrome instance for each account before starting.<br></p>
+        <p>Port 9222: <code>"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome_profile_1"</code><br></p>
+        <p>Port 9223: <code>"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9223 --user-data-dir="C:\chrome_profile_2"</code></p>
+        <!-- for mac -->
+        <!-- <br> <strong>For mac</strong> <br>
+        Port 9222: <code>open -n -a "Google Chrome" --args --remote-debugging-port=9222 --user-data-dir="$HOME/chrome_profile_1"</code> <br>
+        Port 9223: <code>open -n -a "Google Chrome" --args --remote-debugging-port=9223 --user-data-dir="$HOME/chrome_profile_2"</code> -->
+    </div>
+
+    <!-- MAIN DASHBOARD SPLIT -->
+    <div class="dashboard-container">
+        
+        <!-- LEFT PANEL: ACCOUNTS -->
+        <div class="left-panel">
+            <div class="panel-header">
+                <h3>Fleet Accounts</h3>
+                <button id="addAccountBtn">+ Add Account</button>
+            </div>
+            <!-- Container where dynamic accounts will appear -->
+            <div id="accounts-container"></div>
+        </div>
+
+        <!-- RIGHT PANEL: CONTROLS & TERMINAL -->
+        <div class="right-panel">
+            
+            <!-- TIMER PANEL -->
+            <div class="timer-panel">
+                <div class="timer-row">
+                    <div style="flex: 1;">
+                        <label style="color: #ff9800;">Auto-Start Time (HH:MM:SS.ms)</label>
+                        <input type="text" id="autoStartTime" placeholder="08:00:00.005" value="08:00:00.005" style="border-color: #ff9800; background: #2a1a00;">
+                    </div>
+                    <div style="flex: 1; text-align: right;">
+                        <label style="color: #888;">LIVE SYSTEM CLOCK</label>
+                        <div id="liveClock" style="font-family: monospace; font-size: 24px; color: #03dac6; font-weight: bold; letter-spacing: 1px;">00:00:00.000</div>
+                    </div>
+                </div>
+                <button class="action-btn" id="enableTimerBtn" style="background-color: #ff9800; color: #000; width: 100%;">⏰ Arm Auto-Start Mode</button>
+            </div>
+
+            <!-- CORE CONTROLS -->
+            <div class="controls">
+                <button class="action-btn" id="startAllBtn">🚀 START ALL BOTS NOW</button>
+                <button class="action-btn" id="restartBtn" style="flex: 1;">🔄 Force Restart</button>
+                <button class="action-btn" id="clearLogsBtn" style="flex: 1;">🗑️ Clear Logs</button>
+            </div>
+
+            <!-- TERMINAL -->
+            <div class="terminal-wrapper">
+                <div class="terminal-header">LIVE SYSTEM LOGS</div>
+                <div id="terminal">System Ready... Waiting for input.<br></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- ALL JAVASCRIPT REMAINS 100% UNCHANGED ---
+        const container = document.getElementById('accounts-container');
+        const startBtn = document.getElementById('startAllBtn');
+        const clearLogsBtn = document.getElementById('clearLogsBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const terminal = document.getElementById('terminal');
+        let accountCounter = 0;
+
+        function logToTerminal(message) {
+            terminal.innerHTML += `> ${message}<br>`;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Function to create a new Account Card UI
+        function createAccountCard() {
+            accountCounter++;
+            const currentPort = 9221 + accountCounter; 
+            
+            const card = document.createElement('div');
+            card.className = 'account-card';
+            card.id = `account-${accountCounter}`;
+            
+            card.innerHTML = `
+                <button class="remove-btn" onclick="this.parentElement.remove()">X</button>
+                <div style="color: #03dac6; font-weight: bold; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; font-size: 14px;">Account ${accountCounter}</div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Chrome Port</label>
+                        <input type="text" class="inp-port" value="${currentPort}">
+                    </div>
+                    <div class="form-group" style="flex: 2;">
+                        <label>Target URL</label>
+                        <input type="text" class="inp-url" placeholder="https://..." value="">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Target Train (Exact Text)</label>
+                    <input type="text" class="inp-train" value="TISTA EXPRESS (707)">
+                </div>
+
+                <!-- BOGIE & SEAT TARGETING BLOCK -->
+                <div style="display: flex; gap: 10px; margin-bottom: 12px; padding: 12px; background: #181818; border-radius: 6px; border: 1px dashed #03dac6;">
+                    <div class="form-group" style="flex: 1; margin: 0;">
+                        <label style="color: #03dac6;">Target Bogie</label>
+                        <input type="text" class="inp-bogie" placeholder="e.g. KA" value="">
+                    </div>
+                    <div class="form-group" style="flex: 2; margin: 0;">
+                        <label style="color: #03dac6;">Target Seats (Optional)</label>
+                        <input type="text" class="inp-target-seats" placeholder="e.g. KA-15, KA-16" value="">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1.2;">
+                        <label>Seat Class</label>
+                        <input type="text" class="inp-class" value="S_CHAIR">
+                    </div>
+                    <div class="form-group" style="flex: 0.8;">
+                        <label>Seat Count</label>
+                        <input type="number" class="inp-seats" value="1" min="1" max="4">
+                    </div>
+                    <div class="form-group" style="flex: 1.2;">
+                        <label>Bot Mode</label>
+                        <select class="inp-mode">
+                            <option value="Test">Test Mode</option>
+                            <option value="Live">Live Mode</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        }
+
+        createAccountCard();
+        document.getElementById('addAccountBtn').addEventListener('click', createAccountCard);
+
+        // CLEAR LOGS FUNCTIONALITY
+        clearLogsBtn.addEventListener('click', () => {
+            terminal.innerHTML = 'Logs cleared.<br>';
+        });
+
+        // RESTART UI FUNCTIONALITY
+        restartBtn.addEventListener('click', () => {
+            container.innerHTML = '';
+            accountCounter = 0;
+            createAccountCard();
+            logToTerminal("<span style='color:orange;'>System UI reset. All tasks aborted.</span>");
+            startBtn.disabled = false;
+            document.getElementById('addAccountBtn').disabled = false;
+            startBtn.innerText = "🚀 START ALL BOTS NOW";
+            window.electronAPI.restartSystem();
+        });
+
+        // --- PRECISION AUTO-START TIMER LOGIC ---
+        const autoStartTimeInput = document.getElementById('autoStartTime');
+        const enableTimerBtn = document.getElementById('enableTimerBtn');
+        const liveClock = document.getElementById('liveClock');
+        let autoStartActive = false;
+
+        setInterval(() => {
+            const now = new Date();
+            const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
+                               now.getMinutes().toString().padStart(2, '0') + ':' + 
+                               now.getSeconds().toString().padStart(2, '0') + '.' + 
+                               now.getMilliseconds().toString().padStart(3, '0');
+            liveClock.innerText = timeString;
+
+            if (autoStartActive) {
+                const targetTimeStr = autoStartTimeInput.value.trim(); 
+                const [targetTime, targetMs = "0"] = targetTimeStr.split('.');
+                const [tHour, tMin, tSec] = targetTime.split(':').map(Number);
+                
+                const targetDate = new Date();
+                targetDate.setHours(tHour, tMin, tSec, parseInt(targetMs));
+
+                if (now.getTime() >= targetDate.getTime()) {
+                    autoStartActive = false; 
+                    enableTimerBtn.innerText = "⏰ Arm Auto-Start Mode";
+                    enableTimerBtn.style.backgroundColor = "#ff9800";
+                    logToTerminal("<span style='color:#ff9800; font-weight:bold;'>⏰ TARGET TIME REACHED! AUTO-FIRING FLEET!</span>");
+                    
+                    if (!startBtn.disabled) {
+                        startBtn.click(); 
+                    }
+                }
+            }
+        }, 10); 
+
+        enableTimerBtn.addEventListener('click', () => {
+            if (!autoStartActive) {
+                autoStartActive = true;
+                enableTimerBtn.innerText = "🛑 Armed! Waiting for Drop...";
+                enableTimerBtn.style.backgroundColor = "#f44336";
+                enableTimerBtn.style.color = "white";
+                logToTerminal(`Timer ARMED for exactly: <span style='color:yellow;'>${autoStartTimeInput.value}</span>`);
+            } else {
+                autoStartActive = false;
+                enableTimerBtn.innerText = "⏰ Arm Auto-Start Mode";
+                enableTimerBtn.style.backgroundColor = "#ff9800";
+                enableTimerBtn.style.color = "black";
+                logToTerminal("Timer Disarmed.");
+            }
+        });
+
+        // --- CORE EXECUTION ---
+        startBtn.addEventListener('click', () => {
+            const cards = document.querySelectorAll('.account-card');
+            const configs = [];
+
+            cards.forEach(card => {
+                const url = card.querySelector('.inp-url').value;
+                if(url) {
+                    const rawSeats = card.querySelector('.inp-target-seats').value;
+                    const targetSeatArray = rawSeats ? rawSeats.split(',').map(s => s.trim().toUpperCase()).filter(s => s) : [];
+
+                    configs.push({
+                        id: card.id,
+                        port: card.querySelector('.inp-port').value,
+                        url: url,
+                        trainName: card.querySelector('.inp-train').value,
+                        targetBogie: card.querySelector('.inp-bogie').value.trim().toUpperCase(),
+                        targetSeatNames: targetSeatArray,
+                        seatClass: card.querySelector('.inp-class').value,
+                        seats: parseInt(card.querySelector('.inp-seats').value),
+                        mode: card.querySelector('.inp-mode').value
+                    });
+                }
+            });
+
+            if(configs.length === 0) return;
+
+            startBtn.disabled = true;
+            document.getElementById('addAccountBtn').disabled = true;
+            startBtn.innerText = "BOTS ARE RUNNING...";
+            logToTerminal(`Initiating fleet sequence for ${configs.length} accounts...`);
+
+            window.electronAPI.startAllBots(configs);
+        });
+
+        window.electronAPI.onBotLog((message) => { logToTerminal(message); });
+
+        window.electronAPI.onBotFinish((message) => {
+            logToTerminal(`<span style='color:#03dac6; font-weight: bold;'>${message}</span>`);
+            startBtn.disabled = false;
+            document.getElementById('addAccountBtn').disabled = false;
+            startBtn.innerText = "🚀 START ALL BOTS NOW";
+        });
+    </script>
+</body>
+</html>
