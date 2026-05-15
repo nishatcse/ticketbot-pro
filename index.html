@@ -63,6 +63,9 @@
         .input-group input { padding: 6px; background: #0a0a0c; border: 1px solid #333; color: #fff; border-radius: 4px; font-size: 12px; font-family: monospace;}
         .input-group input:focus { border-color: #00e676; outline: none; }
 
+        .input-group select { padding: 6px; background: #0a0a0c; border: 1px solid #333; color: #ff9800; border-radius: 4px; font-size: 11px; font-family: monospace; font-weight: bold; cursor: pointer; }
+        .input-group select:focus { border-color: #00e676; outline: none; }
+
         .target-box { background: #111; padding: 10px; border-radius: 4px; border: 1px dashed #444; }
         
         .card-actions { display: flex; gap: 10px; margin-top: 5px; }
@@ -151,19 +154,27 @@
                 <input type="hidden" class="inp-port" value="${port}">
 
                 <div class="input-row">
-                    <div class="input-group"><label>Origin</label><input type="text" class="inp-origin" value="Dinajpur"></div>
-                    <div class="input-group"><label>Destination</label><input type="text" class="inp-dest" value="Dhaka"></div>
+                    <div class="input-group"><label>Origin</label><input type="text" class="inp-origin" value="Dhaka"></div>
+                    <div class="input-group"><label>Destination</label><input type="text" class="inp-dest" value="Jamalpur_Town"></div>
                 </div>
 
                 <div class="input-row">
                     <div class="input-group" style="flex: 1.5;"><label>Journey Date</label><input type="text" class="inp-doj" value="22-May-2026"></div>
-                    <div class="input-group" style="flex: 2;"><label>Train Name</label><input type="text" class="inp-train" value="DRUTOJAN EXPRESS (758)"></div>
+                    <div class="input-group" style="flex: 2;"><label>Train Name</label><input type="text" class="inp-train" value="TISTA EXPRESS (707)"></div>
                 </div>
 
                 <div class="target-box">
                     <div class="input-row" style="margin-bottom: 8px;">
-                        <div class="input-group"><label>Class</label><input type="text" class="inp-class" value="S_CHAIR"></div>
-                        <div class="input-group"><label>Qty</label><input type="number" class="inp-seats" value="2" min="1" max="4"></div>
+                        <div class="input-group" style="flex: 1;"><label>Class</label><input type="text" class="inp-class" value="S_CHAIR"></div>
+                        <div class="input-group" style="flex: 0.6;"><label>Qty</label><input type="number" class="inp-seats" value="2" min="1" max="4"></div>
+                        <div class="input-group" style="flex: 2;"><label>Strategy (God Mode)</label>
+                            <select class="inp-strategy">
+                                <option value="0">0: Mid->End (Best for Single)</option>
+                                <option value="1">1: Mid->Start (Best for Pair)</option>
+                                <option value="2">2: End->Start (Hacker Zone)</option>
+                                <option value="3">3: Start->End (Skip First 5)</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="input-row">
                         <div class="input-group"><label>Coaches (Optional)</label><input type="text" class="inp-coaches" placeholder="JHA, TA"></div>
@@ -250,6 +261,7 @@
                 trainName: card.querySelector('.inp-train').value.trim(),
                 seatClass: card.querySelector('.inp-class').value.trim(),
                 seats: parseInt(card.querySelector('.inp-seats').value),
+                strategy: parseInt(card.querySelector('.inp-strategy').value),
                 targets: targetSeatArray,
                 coaches: targetCoachArray
             };

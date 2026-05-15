@@ -83,12 +83,13 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                                     DYNAMIC_BOARDING_ID = targetTrain.boarding_points[0].trip_point_id;
                                     
                                     console.log(`[DEBUG] 🎉 TICKETS RELEASED! IDs Grabbed! Moving to attack mode!`);
+                                    cftToken = window.localStorage.getItem('cf-turnstile-response') || document.querySelector('[name="cf-turnstile-response"]')?.value || cftToken;
                                     break;
                                 }
                             }
                         }
                     } catch (error) { /* Silent Ignore */ }
-                    await delay(3000); 
+                    await delay(7500); 
                 }
 
                 // ==========================================
@@ -97,7 +98,8 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                 let successfullyReserved = [];
                 let attemptCount = 0;
                 let firstSeatLockTime = null; 
-                const MAX_WAIT_TIME = 60000; 
+                const MAX_WAIT_TIME = 90000;
+                let partialRetryDone = false;
 
                 while (successfullyReserved.length < cfg.seats) {
                     if (window.__SNIPER_RUN_ID !== currentRunId) return { success: false, message: "Old loop killed by Ninja Switch!" };
@@ -112,7 +114,7 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                     if (successfullyReserved.length > 0) {
                         let elapsedTime = Date.now() - firstSeatLockTime;
                         if (elapsedTime >= MAX_WAIT_TIME) {
-                            console.log(`[DEBUG] ⚠️ 60s TIMEOUT REACHED! Moving to payment with ${successfullyReserved.length} seat(s)!`);
+                            console.log(`[DEBUG] ⚠️ 90s TIMEOUT REACHED! Moving to payment with ${successfullyReserved.length} seat(s)!`);
                             break; 
                         }
                     }
@@ -124,67 +126,153 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                         
                         const layoutData = await layoutRes.json();
                         if (layoutData.error || !layoutData?.data?.seatLayout) {
-                            cftToken = window.localStorage.getItem('cf-turnstile-response') || document.querySelector('[name="cf-turnstile-response"]')?.value || cftToken;
-                            await delay(3000); 
+                            console.log(`[DEBUG] ⚠️ Layout Fetch Failed. Server Response: ${JSON.stringify(layoutData)}`);
+
+                            // 🥷 THE SILENT RESURRECTION (NO PAGE RELOAD)
+                            if (layoutData.error && layoutData.error.messages && layoutData.error.messages.errorKey === "TURNSTILE_VERIFICATION_FAILED") {
+    
+                                // 🧠 SMART RUN: যদি অলরেডি সিট পকেটে থাকে, টোকেন রিসেট না মেরে সোজা পেমেন্টে দৌড়!
+                                if (successfullyReserved.length > 0) {
+                                    console.log(`[DEBUG] 🚨 Token died, but we have ${successfullyReserved.length} seat(s) safely locked! Rushing to payment...`);
+                                    break; 
+                                }
+                            
+                                console.log(`[DEBUG] 🔄 Token died! Forcing Cloudflare to generate a NEW token...`);
+                                
+                                // 🚀 THE BULLETPROOF FIX: 
+                                let expiredToken = cftToken; // মরা টোকেনটা মনে রাখলাম চেনার জন্য
+                                if (window.turnstile) { window.turnstile.reset(); }
+                                
+                                let isNewTokenGrabbed = false;
+                                // ১০ সেকেন্ড পর্যন্ত চেক করবে নতুন টোকেন এলো কি না
+                                for(let w = 0; w < 10; w++) {
+                                    await delay(1000); // ১ সেকেন্ড করে ওয়েট করবে
+                                    let checkToken = document.querySelector('[name="cf-turnstile-response"]')?.value || window.localStorage.getItem('cf-turnstile-response') || "";
+                                    
+                                    // যদি টোকেন ফাঁকা না হয় এবং মরা টোকেনের চেয়ে আলাদা হয়!
+                                    if (checkToken && checkToken !== expiredToken) {
+                                        cftToken = checkToken;
+                                        window.localStorage.setItem('cf-turnstile-response', cftToken);
+                                        console.log(`[DEBUG] 🔋 Fresh Token Grabbed in ${w + 1} seconds!`);
+                                        isNewTokenGrabbed = true;
+                                        break; // নতুন পেয়ে গেলে লুপ থেকে বেরিয়ে আসবে
+                                    }
+                                }
+
+                                if (!isNewTokenGrabbed) {
+                                    console.log(`[DEBUG] ❌ Cloudflare is stuck! Retrying in next loop...`);
+                                    await delay(3000);
+                                }
+                            } else {
+                                // অন্য কোনো এরর হলে নরমাল ওয়েট
+                                await delay(7500); 
+                            }
                             continue; 
                         }
 
-                        let targetSeats = [];
+                        // ==========================================
+                        // 👻 PHASE B: WHOLE MAP NINJA SCANNER (No fastExit)
+                        // ==========================================
                         let exactMatches = [];
                         let coachMatches = [];
                         let anyMatches = [];
-                        let fastExit = false;
-                        let poolSize = seatsNeeded + 6; 
 
+                        // 🚀 পুরো ট্রেনের ম্যাপ স্ক্যান করে সব ফাঁকা সিট লিস্টে আনবে
                         for (let floor of layoutData.data.seatLayout) {
                             for (let row of floor.layout) {
                                 for (let seat of row) {
-                                    if (seat.seat_availability === 1 && seat.ticket_id) {
+                                    if (seat.seat_availability == 1 && seat.ticket_id && seat.seat_number) {
+                                        // যদি অলরেডি ჩვენদের পকেটে থাকে, স্কিপ
                                         if (successfullyReserved.some(resSeat => resSeat.id == seat.ticket_id)) continue;
 
                                         let s = { id: seat.ticket_id, name: seat.seat_number, coach: floor.floor_name };
 
+                                        // ক্যাটাগরি অনুযায়ী সিট ভাগ করা
                                         if (cfg.targets && cfg.targets.includes(s.name)) { exactMatches.push(s); } 
                                         else if (cfg.coaches && cfg.coaches.includes(s.coach)) { coachMatches.push(s); } 
                                         else { anyMatches.push(s); }
-
-                                        let noTargets = (!cfg.targets || cfg.targets.length === 0);
-                                        let noCoaches = (!cfg.coaches || cfg.coaches.length === 0);
-
-                                        if (noTargets && noCoaches && anyMatches.length >= poolSize) { fastExit = true; break; }
-                                        if (noTargets && !noCoaches && coachMatches.length >= poolSize) { fastExit = true; break; }
-                                        if (!noTargets) {
-                                            let gotAllTargets = (exactMatches.length === cfg.targets.length || exactMatches.length >= seatsNeeded);
-                                            if (gotAllTargets) {
-                                                if (!noCoaches && (exactMatches.length + coachMatches.length >= poolSize)) { fastExit = true; break; }
-                                                if (noCoaches && (exactMatches.length + anyMatches.length >= poolSize)) { fastExit = true; break; }
-                                            }
-                                        }
                                     }
                                 }
-                                if (fastExit) break;
                             }
-                            if (fastExit) break;
                         }
 
-                        const shuffle = (array) => array.sort(() => Math.random() - 0.5);
+                        // ==========================================
+                        // 🧠 ADVANCED SWARM INTELLIGENCE: Priority Filtering
+                        // ==========================================
+                        
+                        // 🧠 THE STRATEGY ENGINE (লিস্ট সাজানোর ফাংশন)
+                        function applyStrategy(list, strategyId) {
+                            if (list.length === 0) return []; 
+                            let mid = Math.floor(list.length / 2);
 
+                            // 🚀 আপনার লজিক: সিট ১৪টা বা তার বেশি হলেই কেবল ৫টা স্কিপ করবে, নইলে ০ স্কিপ!
+                            let skipCount = list.length >= 14 ? 5 : 0;
+                            
+                            if (strategyId === 0) return list.slice(mid); // Middle -> End
+                            if (strategyId === 1) return list.slice(0, mid).reverse(); // Middle -> Start
+                            if (strategyId === 2) return list.slice().reverse().slice(skipCount); // End -> Start (Skip skipCount)
+                            if (strategyId === 3) return list.slice(skipCount); // Start -> End (Skip skipCount)
+                            return list;
+                        }
+
+                        // God Mode: UI Strategy or Port fallback
+                        let attackVector = cfg.strategy !== undefined ? parseInt(cfg.strategy) : cfg.port % 4; 
+
+                        // 🎯 বগি এবং রেন্ডম সিট আলাদা আলাদা সাজানো হচ্ছে (যাতে মিক্স হয়ে বাদ না পড়ে!)
+                        let sortedCoach = applyStrategy(coachMatches, attackVector);
+                        let sortedAny = applyStrategy(anyMatches, attackVector);
+
+                        // 🚀 THE FINAL TARGET POOL (Guaranteeing Exactly 9 Seats)
+                        let targetSeats = [];
+                        let poolSize = 9; 
+
+                        // Priority 1: Exact Targets (KA-1, KA-2)
                         targetSeats.push(...exactMatches); 
-                        if (targetSeats.length < poolSize) { targetSeats.push(...shuffle(coachMatches).slice(0, poolSize - targetSeats.length)); }
-                        if (targetSeats.length < poolSize) { targetSeats.push(...shuffle(anyMatches).slice(0, poolSize - targetSeats.length)); }
+
+                        // Priority 2: Selected Coach Seats
+                        if (targetSeats.length < poolSize) { 
+                            targetSeats.push(...sortedCoach.slice(0, poolSize - targetSeats.length)); 
+                        }
+
+                        // Priority 3: Backup Random Seats (টু মেক শিওর সে ৯টাই পায়)
+                        if (targetSeats.length < poolSize) { 
+                            targetSeats.push(...sortedAny.slice(0, poolSize - targetSeats.length)); 
+                        }
 
                         if (targetSeats.length === 0) {
-                            await delay(3000); 
+                            console.log(`[DEBUG] ⚠️ No valid seats found in the whole train. Waiting...`);
+                            await delay(7500); 
                             continue;
                         }
 
-                        // --- PHASE C: RESERVE ---
+                        // 🚀 RADAR TRACKER: আপনি নিজের চোখে দেখবেন সে কোন ৯টায় ফায়ার করছে!
+                        console.log(`[DEBUG] 🔫 Arsenal loaded with ${targetSeats.length} bullet(s): [ ${targetSeats.map(s => s.name).join(', ')} ]`);
+
+                        // --- PHASE C: RESERVE (MICRO-OPTIMIZED FOR SPEED) ---
+                        
+                        // ⚡ স্পিড হ্যাক: লুপের বাইরে আগে থেকেই বডি তৈরি করে রাখা হচ্ছে
+                        const basePayload = {
+                            route_id: DYNAMIC_ROUTE_ID.toString(),
+                            cft_response: cftToken,
+                            extras: { origin_name: cfg.origin, destination_name: cfg.dest, trip_number: cfg.trainName }
+                        };
+                        let requestsFired = 0;
+
                         for (let i = 0; i < targetSeats.length; i++) {
                             if (successfullyReserved.length >= cfg.seats) break;
 
+                            // 🛑 Hard Cap: কোনোভাবেই যেন ৯টার বেশি রিকোয়েস্ট ফায়ার না হয়
+                            if (requestsFired >= 9) break;
+
+                            // শুধু পরিবর্তনশীল ডেটাগুলো লুপের ভেতরে আপডেট হবে
+                            basePayload.ticket_id = targetSeats[i].id.toString();
+                            basePayload.action_token = actionToken;
+                            basePayload.extras.seat_number = targetSeats[i].name;
+
+                            requestsFired++; // ফায়ার কাউন্ট বাড়ালাম
                             const reserveRes = await fetch("https://railspaapi.shohoz.com/v1.0/web/bookings/reserve-seat", {
                                 method: "PATCH", headers: apiHeaders, 
-                                body: JSON.stringify({ "ticket_id": targetSeats[i].id.toString(), "route_id": DYNAMIC_ROUTE_ID.toString(), "action_token": actionToken, "cft_response": cftToken, "extras": { "origin_name": cfg.origin, "destination_name": cfg.dest, "seat_number": targetSeats[i].name, "trip_number": cfg.trainName } })
+                                body: JSON.stringify(basePayload) // ⚡ মিলি-সেকেন্ড সেভ হবে!
                             });
                             
                             const loopATK = reserveRes.headers.get('x-action-token');
@@ -202,7 +290,62 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                             }
                         }
 
-                        if (successfullyReserved.length < cfg.seats) { await delay(3000); }
+                        // লুপ শেষ হওয়ার পর যদি কাঙ্ক্ষিত সিট না পাই:
+                        if (successfullyReserved.length < cfg.seats) { 
+                            
+                            // 🟡 সিনারিও ১: যদি হাতে কিছু সিট থাকে (যেমন ২টা পেয়েছে কিন্তু ৪টা দরকার)
+                            if (successfullyReserved.length > 0) {
+                                if (!partialRetryDone) {
+                                    console.log(`[DEBUG] 🚨 Got ${successfullyReserved.length}/${cfg.seats} seat(s)! Tactical Sleep for 60s for ONE FINAL TRY...`);
+                                    partialRetryDone = true; // মার্ক করে রাখলাম যে একবার সুযোগ দেওয়া হয়েছে
+                                    
+                                    await delay(60000); // ৬০ সেকেন্ড ঘুম
+
+                                    // 🚀 THE FIX: ঘুম থেকে উঠে স্মার্ট পোলিং দিয়ে টোকেন ফ্রেশ করে নিচ্ছি
+                                    let sleepExpiredToken1 = cftToken;
+                                    if (window.turnstile) { window.turnstile.reset(); }
+                                    
+                                    for(let w = 0; w < 10; w++) {
+                                        await delay(1000); 
+                                        let checkToken = document.querySelector('[name="cf-turnstile-response"]')?.value || window.localStorage.getItem('cf-turnstile-response') || "";
+                                        if (checkToken && checkToken !== sleepExpiredToken1) {
+                                            cftToken = checkToken;
+                                            window.localStorage.setItem('cf-turnstile-response', cftToken);
+                                            break;
+                                        }
+                                    }
+
+                                    console.log(`[DEBUG] 🔋 Woke up! Final Burst Mode Activated!`);
+                                    continue; // আবার নতুন করে ম্যাপ এনে বাকি সিটগুলো খুঁজবে
+                                } else {
+                                    // যদি অলরেডি একবার ঘুমিয়ে ট্রাই করে থাকে, তবে আর রিস্ক নেবে না!
+                                    console.log(`[DEBUG] 🚨 Final try failed. Rushing to payment with ${successfullyReserved.length} seat(s)!`);
+                                    break; // লুপ ভেঙে সোজা OTP/Payment এ চলে যাবে!
+                                }
+                            }
+                            
+                            // 🔴 সিনারিও ২: যদি শূন্য (০) সিট থাকে (পুরো ট্রেনের কেউ কিছু পায়নি)
+                            console.log(`[DEBUG] 🛑 Burst exhausted (0 seats)! Tactical Sleep for 60 seconds to reset Server Rate Limit...`);
+
+                            await delay(60000); // ⏳ ৬০ সেকেন্ডের ডিপ স্লিপ!
+
+                            // 🚀 THE FIX: ঘুম থেকে উঠে স্মার্ট পোলিং দিয়ে টোকেন ফ্রেশ করে নিচ্ছি
+                            let sleepExpiredToken2 = cftToken;
+                            if (window.turnstile) { window.turnstile.reset(); }
+                            
+                            for(let w = 0; w < 10; w++) {
+                                await delay(1000);
+                                let checkToken = document.querySelector('[name="cf-turnstile-response"]')?.value || window.localStorage.getItem('cf-turnstile-response') || "";
+                                if (checkToken && checkToken !== sleepExpiredToken2) {
+                                    cftToken = checkToken;
+                                    window.localStorage.setItem('cf-turnstile-response', cftToken);
+                                    break;
+                                }
+                            }
+                            
+                            console.log(`[DEBUG] 🔋 Woke up! Fresh Token Grabbed. Ready for next Burst!`);
+                            continue; // আবার নতুন করে লেআউট আনতে যাবে
+                        }
 
                     } catch (error) {
                         console.log(`[DEBUG] Network blip, surviving...`);

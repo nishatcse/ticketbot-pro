@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const puppeteer = require('puppeteer');
 // const runBot = require('./bot'); 
 const { fork } = require('child_process'); // NEW: For Multi-Processing
 const { machineIdSync } = require('node-machine-id'); // NEW: For Hardware ID
@@ -189,12 +190,38 @@ ipcMain.on('start-api-node', (event, config) => {
     worker.send({ type: 'START', config: config });
 });
 
-// Target and kill a specific bot
-ipcMain.on('stop-api-node', (event, port) => {
+// আপনার main.js এর একদম ওপরে (অন্যান্য require এর সাথে) puppeteer ইম্পোর্ট করে নিন:
+// const puppeteer = require('puppeteer'); (যদি অলরেডি না থাকে তবে অ্যাড করুন)
+
+// Target and kill a specific bot (UPDATED FOR BROWSER KILL SWITCH)
+ipcMain.on('stop-api-node', async (event, port) => {
     const portNum = parseInt(port);
+    
     if (apiWorkers.has(portNum)) {
+        // 1. Send Abort signal to Node.js Worker
         const worker = apiWorkers.get(portNum);
         worker.send({ type: 'ABORT' });
+        
+        // 2. 🥷 THE NINJA KILL SHOT: Connect to Chrome and kill the loop!
+        try {
+            const puppeteer = require('puppeteer'); // Require it here just for the kill shot
+            const browser = await puppeteer.connect({ browserURL: `http://127.0.0.1:${portNum}` });
+            const pages = await browser.pages();
+            let activeTab = pages.find(page => page.url().includes('shohoz.com') || page.url().includes('railway.gov.bd'));
+            
+            if (activeTab) {
+                await activeTab.evaluate(() => {
+                    // Changing this ID instantly breaks the while(true) loops inside apiBot.js
+                    window.__SNIPER_RUN_ID = "KILLED_BY_USER_" + Date.now(); 
+                });
+                console.log(`[Main] Browser loop on Port ${portNum} terminated successfully.`);
+            }
+            browser.disconnect();
+        } catch (err) {
+            console.log(`[Main] Could not connect to browser on Port ${portNum} for termination: ${err.message}`);
+        }
+
+        // 3. Finally, kill the Node process and clean up
         worker.kill();
         apiWorkers.delete(portNum);
         event.reply('api-log', { port: portNum, message: `<span style='color:#cf6679;'>🛑 Process aborted manually.</span>` });
