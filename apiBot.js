@@ -6,7 +6,7 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
     let browser;
 
     try {
-        browser = await puppeteer.connect({ browserURL: `http://127.0.0.1:${config.port}`, defaultViewport: null });
+        browser = await puppeteer.connect({ browserURL: `http://127.0.0.1:${config.port}`, defaultViewport: null, protocolTimeout: 0 });
         const pages = await browser.pages();
         let activeTab = pages.find(page => page.url().includes('railway.gov.bd') || page.url().includes('shohoz.com'));
 
@@ -66,7 +66,7 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
 
                     try {
                         const searchUrl = `https://railspaapi.shohoz.com/v1.0/web/bookings/search-trips-v2?from_city=${cfg.origin}&to_city=${cfg.dest}&date_of_journey=${cfg.doj}&seat_class=${cfg.seatClass}`;
-                        const searchRes = await fetch(searchUrl, { headers: apiHeaders });
+                        const searchRes = await fetch(searchUrl, { headers: apiHeaders, cache: "no-store" });
                         
                         const searchATK = searchRes.headers.get('x-action-token');
                         if (searchATK) { actionToken = searchATK; apiHeaders["x-action-token"] = searchATK; window.sessionStorage.setItem('atk', searchATK); }
@@ -92,12 +92,153 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                     await delay(7500); 
                 }
 
+
                 // ==========================================
-                // 👻 PHASE B: SINGLE-PASS NINJA SCANNER
+                // ⏳ PHASE 0.5: THE HYBRID STRIKE CONTROLLER
                 // ==========================================
+                
+                if (cfg.useSchedule) {
+                    // 🕒 SCHEDULED STRIKE MODE
+                    let targetH = cfg.targetHour !== undefined ? cfg.targetHour : 8; 
+                    let targetM = cfg.targetMinute !== undefined ? cfg.targetMinute : 0;
+                    let targetS = cfg.targetSecond !== undefined ? cfg.targetSecond : 0; 
+
+                    let targetDate = new Date();
+                    targetDate.setHours(targetH, targetM, targetS, 0);
+                    let targetTimeMs = targetDate.getTime();
+                    let nowMsCheck = Date.now();
+
+                    // Late Start Logic
+                    if (targetTimeMs < nowMsCheck) {
+                        let lateByMs = nowMsCheck - targetTimeMs;
+                        if (Math.floor(lateByMs / 60000) < 30) {
+                            console.log(`[DEBUG] ⚠️ LATE START DETECTED! Bypassing Timer...`);
+                        } else {
+                            targetDate.setDate(targetDate.getDate() + 1);
+                            targetTimeMs = targetDate.getTime();
+                        }
+                    }
+
+                    let timeStr = `${targetH.toString().padStart(2, '0')}:${targetM.toString().padStart(2, '0')}:${targetS.toString().padStart(2, '0')}`;
+                    console.log(`[DEBUG] ⏳ SCHEDULED MODE: Entering Holding Pattern for exactly ${timeStr} ...`);
+                    
+                    let lastLogSecond = -1;
+
+                    while (true) {
+                        if (window.__SNIPER_RUN_ID !== currentRunId) return { success: false, message: "Killed by Ninja Switch!" };
+                        
+                        let nowMs = Date.now(); 
+                        let timeDiff = targetTimeMs - nowMs;
+
+                        // 🚀 BINGO!
+                        if (timeDiff <= 0) {
+                            cftToken = document.querySelector('[name="cf-turnstile-response"]')?.value || window.localStorage.getItem('cf-turnstile-response') || cftToken;
+                            console.log(`[DEBUG] 🚀 BINGO! CLOCK HIT ${timeStr} - TIME IS UP! UNLEASHING PHASE B! GO GO GO!`);
+                            break; 
+                        }
+
+                        // ⚡ High Precision Wait
+                        if (timeDiff <= 60000) {
+                            let secondsLeft = Math.ceil(timeDiff / 1000); 
+                            if (secondsLeft !== lastLogSecond) {
+                                console.log(`[DEBUG] ⚡ T-Minus ${secondsLeft} seconds to Attack!`);
+                                if (secondsLeft === 8) {
+                                    console.log(`[DEBUG] 🔄 PRE-WARMING: Forcing Cloudflare to generate a fresh token...`);
+                                    if (window.turnstile) { window.turnstile.reset(); }
+                                }
+                                lastLogSecond = secondsLeft;
+                            }
+                            await delay(50); 
+                            continue; 
+                        }
+                        
+                        // 💤 Normal Wait
+                        let s = new Date(nowMs).getSeconds();
+                        if (s % 10 === 0 && s !== lastLogSecond) {
+                            console.log(`[DEBUG] 💤 Holding Pattern Active... Target: ${timeStr}`);
+                            lastLogSecond = s;
+                        }
+                        await delay(1000); 
+                    }
+                } else {
+                    // ⚡ INSTANT STRIKE MODE (No Timer)
+                    console.log(`[DEBUG] ⚡ INSTANT STRIKE MODE ACTIVATED! Bypassing Timer, attacking immediately!`);
+                    // নিশ্চিত হওয়ার জন্য টোকেনটা রিড করে নিলাম
+                    cftToken = document.querySelector('[name="cf-turnstile-response"]')?.value || window.localStorage.getItem('cf-turnstile-response') || cftToken;
+                }
+
+
                 let successfullyReserved = [];
-                let attemptCount = 0;
                 let firstSeatLockTime = null; 
+
+                // // ==========================================
+                // // 🎯 THE NEW WEAPON: BLIND SNIPER (DIRECT HIT MODE)
+                // // ==========================================
+                // if (cfg.directHitSeats && cfg.directHitSeats.length > 0) {
+                //     console.log(`[DEBUG] 🚨 BLIND SNIPER MODE ACTIVATED! Bypassing Layout Map... Directly attacking ${cfg.directHitSeats.length} exact IDs!`);
+                    
+                //     const basePayload = {
+                //         route_id: DYNAMIC_ROUTE_ID.toString(),
+                //         cft_response: cftToken,
+                //         extras: { origin_name: cfg.origin, destination_name: cfg.dest, trip_number: cfg.trainName }
+                //     };
+                    
+                //     for (let s of cfg.directHitSeats) {
+                //         if (successfullyReserved.length >= cfg.seats) break;
+                        
+                //         basePayload.ticket_id = s.id.toString();
+                //         basePayload.action_token = actionToken;
+                //         basePayload.extras.seat_number = s.name;
+
+                //         try {
+                //             const reserveRes = await fetch("https://railspaapi.shohoz.com/v1.0/web/bookings/reserve-seat", {
+                //                 method: "PATCH", headers: apiHeaders, cache: "no-store",
+                //                 body: JSON.stringify(basePayload)
+                //             });
+                            
+                //             const loopATK = reserveRes.headers.get('x-action-token');
+                //             if (loopATK) { actionToken = loopATK; apiHeaders["x-action-token"] = loopATK; window.sessionStorage.setItem('atk', loopATK); }
+                            
+                //             const reserveData = await reserveRes.json();
+                            
+                //             if (!reserveData.error) {
+                //                 successfullyReserved.push(s);
+                //                 if (!firstSeatLockTime) firstSeatLockTime = Date.now();
+                //                 console.log(`[DEBUG] 🎯 DIRECT HIT SUCCESS! Locked: ${s.name}`);
+                //             } else {
+                //                 console.log(`[DEBUG] ⚔️ Direct Hit Failed for ${s.name} (Hijacked)!`);
+                //             }
+                //         } catch (e) {
+                //             console.log(`[DEBUG] ⚠️ Direct Hit Network Error on ${s.name}`);
+                //         }
+                //     }
+
+                //     // 🛑 যদি ডাইরেক্ট হিটে কাজ না হয় (বা আংশিক হয়), তাহলে আপনার লজিক অনুযায়ী ৬০ সেকেন্ডের রেস্ট নিয়ে Fallback করবে!
+                //     if (successfullyReserved.length < cfg.seats) {
+                //         console.log(`[DEBUG] 🛑 Blind Sniper missed target! Taking Tactical 60s Sleep before falling back to Normal Radar...`);
+                //         await delay(60000); 
+
+                //         // 🚀 ঘুম থেকে উঠে স্মার্ট পোলিং দিয়ে টোকেন ফ্রেশ করে নিচ্ছি
+                //         let fallbackExpiredToken = cftToken;
+                //         if (window.turnstile) { window.turnstile.reset(); }
+                        
+                //         for(let w = 0; w < 10; w++) {
+                //             await delay(1000);
+                //             let checkToken = document.querySelector('[name="cf-turnstile-response"]')?.value || window.localStorage.getItem('cf-turnstile-response') || "";
+                //             if (checkToken && checkToken !== fallbackExpiredToken) {
+                //                 cftToken = checkToken;
+                //                 window.localStorage.setItem('cf-turnstile-response', cftToken);
+                //                 break;
+                //             }
+                //         }
+                //         console.log(`[DEBUG] 🔋 Woke up! Shifting to Phase B (Normal Layout Radar)...`);
+                //     }
+                // }
+
+                // ==========================================
+                // 👻 PHASE B: SINGLE-PASS NINJA SCANNER (No fastExit)
+                // ==========================================
+                let attemptCount = 0;
                 const MAX_WAIT_TIME = 90000;
                 let partialRetryDone = false;
 
@@ -120,7 +261,7 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                     }
 
                     try {
-                        const layoutRes = await fetch(`https://railspaapi.shohoz.com/v1.0/web/bookings/seat-layout?trip_id=${DYNAMIC_TRIP_ID}&trip_route_id=${DYNAMIC_ROUTE_ID}&cft_response=${cftToken}`, { headers: apiHeaders });
+                        const layoutRes = await fetch(`https://railspaapi.shohoz.com/v1.0/web/bookings/seat-layout?trip_id=${DYNAMIC_TRIP_ID}&trip_route_id=${DYNAMIC_ROUTE_ID}&cft_response=${cftToken}`, { headers: apiHeaders, cache: "no-store" });
                         const layoutATK = layoutRes.headers.get('x-action-token');
                         if (layoutATK) { actionToken = layoutATK; apiHeaders["x-action-token"] = layoutATK; window.sessionStorage.setItem('atk', layoutATK); }
                         
@@ -169,6 +310,33 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                             }
                             continue; 
                         }
+
+                        // 🛠️ TEMPORARY HACK: DOWNLOAD SEAT LAYOUT TO PC 🛠️
+// // (কাজ শেষ হলে এই ব্লকটুকু মুছে দেবেন)
+// if (!window.__layoutDownloaded) {
+//     try {
+//         const jsonString = JSON.stringify(layoutData, null, 2);
+//         const blob = new Blob([jsonString], { type: "application/json" });
+//         const url = URL.createObjectURL(blob);
+//         const a = document.createElement('a');
+//         a.href = url;
+        
+//         // ট্রেনের নামের সাথে মিলিয়ে ফাইলের নাম হবে
+//         let safeTrainName = cfg.trainName.replace(/[^a-zA-Z0-9]/g, '_'); 
+//         a.download = `${safeTrainName}_SeatLayout.json`;
+        
+//         document.body.appendChild(a);
+//         a.click();
+//         document.body.removeChild(a);
+//         URL.revokeObjectURL(url);
+        
+//         window.__layoutDownloaded = true; // যেন লুপে বারবার ডাউনলোড না হয়
+//         console.log(`[DEBUG] 📥 BINGO! SEAT LAYOUT SAVED TO YOUR DOWNLOADS FOLDER!`);
+//     } catch (e) {
+//         console.log(`[DEBUG] ⚠️ Failed to download layout: ${e.message}`);
+//     }
+// }
+// // 🛠️ END OF TEMPORARY HACK 🛠️
 
                         // ==========================================
                         // 👻 PHASE B: WHOLE MAP NINJA SCANNER (No fastExit)
@@ -272,6 +440,7 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                             requestsFired++; // ফায়ার কাউন্ট বাড়ালাম
                             const reserveRes = await fetch("https://railspaapi.shohoz.com/v1.0/web/bookings/reserve-seat", {
                                 method: "PATCH", headers: apiHeaders, 
+                                cache: "no-store",  // 🚀 THE SPEED HACK: কোনো ক্যাশ চেক ছাড়াই সরাসরি ডাটাবেসে আঘাত!
                                 body: JSON.stringify(basePayload) // ⚡ মিলি-সেকেন্ড সেভ হবে!
                             });
                             
@@ -358,7 +527,8 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
 
                 // ⚠️ Uncommented this to actually trigger the SMS to user's phone
                 const otpRes = await fetch("https://railspaapi.shohoz.com/v1.0/web/bookings/passenger-details", {
-                    method: "POST", headers: apiHeaders, body: JSON.stringify({ "ticket_ids": successfullyReserved.map(s => parseInt(s.id)), "trip_id": DYNAMIC_TRIP_ID.toString(), "trip_route_id": DYNAMIC_ROUTE_ID.toString() })
+                    method: "POST", headers: apiHeaders, cache: "no-store",
+                    body: JSON.stringify({ "ticket_ids": successfullyReserved.map(s => parseInt(s.id)), "trip_id": DYNAMIC_TRIP_ID.toString(), "trip_route_id": DYNAMIC_ROUTE_ID.toString() })
                 });
                 const otpATK = otpRes.headers.get('x-action-token');
                 if (otpATK) window.sessionStorage.setItem('atk', otpATK);
@@ -412,7 +582,7 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
 
                 // --- PHASE E: VERIFY OTP ---
                 const verifyRes = await fetch("https://railspaapi.shohoz.com/v1.0/web/bookings/verify-otp", {
-                    method: "POST", headers: apiHeaders, 
+                    method: "POST", headers: apiHeaders, cache: "no-store",
                     body: JSON.stringify({ "trip_id": parseInt(tripId), "trip_route_id": parseInt(routeId), "ticket_ids": ticketIds, "otp": otpCode.toString() })
                 });
 
@@ -453,7 +623,8 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                 };
 
                 const confirmRes = await fetch("https://railspaapi.shohoz.com/v1.0/web/bookings/confirm", {
-                    method: "PATCH", headers: apiHeaders, body: JSON.stringify(confirmPayload)
+                    method: "PATCH", headers: apiHeaders, cache: "no-store",
+                    body: JSON.stringify(confirmPayload)
                 });
 
                 const confirmData = await confirmRes.json();

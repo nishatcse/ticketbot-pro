@@ -160,6 +160,12 @@
 
                 <div class="input-row">
                     <div class="input-group" style="flex: 1.5;"><label>Journey Date</label><input type="text" class="inp-doj" value="22-May-2026"></div>
+                    <div class="input-group" style="flex: 1.8;">
+                        <label style="color: #ff9800;">
+                            <input type="checkbox" class="inp-use-time" style="vertical-align: middle; margin: 0 5px 0 0;"> Scheduled Strike
+                        </label>
+                        <input type="time" class="inp-release-time" step="1" value="08:00:02">
+                    </div>
                     <div class="input-group" style="flex: 2;"><label>Train Name</label><input type="text" class="inp-train" value="TISTA EXPRESS (707)"></div>
                 </div>
 
@@ -181,6 +187,13 @@
                         <div class="input-group"><label>Exact Seats</label><input type="text" class="inp-targets" placeholder="JHA-41, JHA-42"></div>
                     </div>
                 </div>
+
+                <!-- <div class="input-row" style="margin-top: 8px;">
+                    <div class="input-group">
+                        <label style="color: #ff4c4c;">Blind Sniper / Direct Hit (ID:Seat)</label>
+                        <input type="text" class="inp-direct-hit" placeholder="567891:TA-12, 567892:TA-13" style="border-color: #cf6679;">
+                    </div>
+                </div> -->
 
                 <div class="card-actions">
                     <button class="btn-card start" onclick="startNode(${port})">▶ START</button>
@@ -228,7 +241,7 @@
                     startAll();
                 }
             }
-        }, 10);
+        }, 100);
 
         document.getElementById('btnArmTimer').addEventListener('click', function() {
             autoStartActive = !autoStartActive;
@@ -253,6 +266,19 @@
             const rawCoaches = card.querySelector('.inp-coaches').value;
             const targetCoachArray = rawCoaches ? rawCoaches.split(',').map(s => s.trim().toUpperCase()).filter(s => s) : [];
 
+            // // 🚀 NEW: PARSING BLIND SNIPER DATA (Format -> ID:Seat)
+            // const rawDirectHits = card.querySelector('.inp-direct-hit').value;
+            // const directHitArray = rawDirectHits ? rawDirectHits.split(',').map(s => {
+            //     const parts = s.split(':');
+            //     if (parts.length === 2) return { id: parts[0].trim(), name: parts[1].trim().toUpperCase() };
+            //     return null;
+            // }).filter(s => s !== null) : [];
+
+            // 🚀 NEW: Check if user wants Scheduled or Instant Strike
+            const useSchedule = card.querySelector('.inp-use-time').checked;
+            const releaseTimeRaw = card.querySelector('.inp-release-time').value || "08:00:00";
+            const [relHour, relMinute, relSecond = 0] = releaseTimeRaw.split(':').map(Number);
+
             const config = {
                 port: port,
                 origin: card.querySelector('.inp-origin').value.trim(),
@@ -263,7 +289,13 @@
                 seats: parseInt(card.querySelector('.inp-seats').value),
                 strategy: parseInt(card.querySelector('.inp-strategy').value),
                 targets: targetSeatArray,
-                coaches: targetCoachArray
+                coaches: targetCoachArray,
+                // directHitSeats: directHitArray, // 👈 NEW: Passing the blind sniper data
+                // 🚀 NEW: Sending Schedule Flags
+                useSchedule: useSchedule,
+                targetHour: relHour,
+                targetMinute: relMinute,
+                targetSecond: relSecond
             };
 
             const term = document.getElementById(`term-${port}`);

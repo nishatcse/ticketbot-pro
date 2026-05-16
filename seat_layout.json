@@ -1,0 +1,460 @@
+{
+  "data": {
+    "seatLayout": [
+      {
+        "floor_name": "KHA",
+        "seat_floor": 0,
+        "seat_type": 0,
+        "fare_type_id": 0,
+        "seat_fare_type": "",
+        "seat_availability": false,
+        "seat_fare": "1885.00",
+        "layout": [
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172559,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-1",
+              "ticket_id": 607172560,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-2",
+              "ticket_id": 607172561,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172562,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-3",
+              "ticket_id": 607172563,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-4",
+              "ticket_id": 607172564,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172565,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172566,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172567,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172568,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-5",
+              "ticket_id": 607172569,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-6",
+              "ticket_id": 607172570,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172571,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172572,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172573,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172574,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-7",
+              "ticket_id": 607172575,
+              "ticket_type": 3
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-8",
+              "ticket_id": 607172576,
+              "ticket_type": 3
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172577,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-9",
+              "ticket_id": 607172578,
+              "ticket_type": 3
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-10",
+              "ticket_id": 607172579,
+              "ticket_type": 3
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172580,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172581,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172582,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172583,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-11",
+              "ticket_id": 607172584,
+              "ticket_type": 4
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-12",
+              "ticket_id": 607172585,
+              "ticket_type": 4
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172586,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172587,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172588,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172589,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-13",
+              "ticket_id": 607172590,
+              "ticket_type": 4
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-14",
+              "ticket_id": 607172591,
+              "ticket_type": 4
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172592,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172593,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172594,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172595,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-15",
+              "ticket_id": 607172596,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-16",
+              "ticket_id": 607172597,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172598,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-17",
+              "ticket_id": 607172599,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-18",
+              "ticket_id": 607172600,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172601,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172602,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172603,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172604,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-19",
+              "ticket_id": 607172605,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-20",
+              "ticket_id": 607172606,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172607,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172608,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172609,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172610,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-21",
+              "ticket_id": 607172611,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-22",
+              "ticket_id": 607172612,
+              "ticket_type": 0
+            }
+          ],
+          [
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "",
+              "ticket_id": 607172613,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-LO-23",
+              "ticket_id": 607172614,
+              "ticket_type": 0
+            },
+            {
+              "isHidden": false,
+              "seat_availability": 0,
+              "seat_number": "KHA-UP-24",
+              "ticket_id": 607172615,
+              "ticket_type": 0
+            }
+          ]
+        ]
+      }
+    ],
+    "totalSeats": 57,
+    "reservationFee": 30,
+    "reservationFeeUnit": "%"
+  },
+  "extra": {
+    "hash": "336D0A69FD56AC97DCA280826F3C6723"
+  }
+}
