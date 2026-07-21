@@ -171,69 +171,6 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                 let successfullyReserved = [];
                 let firstSeatLockTime = null; 
 
-                // // ==========================================
-                // // 🎯 THE NEW WEAPON: BLIND SNIPER (DIRECT HIT MODE)
-                // // ==========================================
-                // if (cfg.directHitSeats && cfg.directHitSeats.length > 0) {
-                //     console.log(`[DEBUG] 🚨 BLIND SNIPER MODE ACTIVATED! Bypassing Layout Map... Directly attacking ${cfg.directHitSeats.length} exact IDs!`);
-                    
-                //     const basePayload = {
-                //         route_id: DYNAMIC_ROUTE_ID.toString(),
-                //         cft_response: cftToken,
-                //         extras: { origin_name: cfg.origin, destination_name: cfg.dest, trip_number: cfg.trainName }
-                //     };
-                    
-                //     for (let s of cfg.directHitSeats) {
-                //         if (successfullyReserved.length >= cfg.seats) break;
-                        
-                //         basePayload.ticket_id = s.id.toString();
-                //         basePayload.action_token = actionToken;
-                //         basePayload.extras.seat_number = s.name;
-
-                //         try {
-                //             const reserveRes = await fetch("https://railspaapi.shohoz.com/v1.0/web/bookings/reserve-seat", {
-                //                 method: "PATCH", headers: apiHeaders, cache: "no-store",
-                //                 body: JSON.stringify(basePayload)
-                //             });
-                            
-                //             const loopATK = reserveRes.headers.get('x-action-token');
-                //             if (loopATK) { actionToken = loopATK; apiHeaders["x-action-token"] = loopATK; window.sessionStorage.setItem('atk', loopATK); }
-                            
-                //             const reserveData = await reserveRes.json();
-                            
-                //             if (!reserveData.error) {
-                //                 successfullyReserved.push(s);
-                //                 if (!firstSeatLockTime) firstSeatLockTime = Date.now();
-                //                 console.log(`[DEBUG] 🎯 DIRECT HIT SUCCESS! Locked: ${s.name}`);
-                //             } else {
-                //                 console.log(`[DEBUG] ⚔️ Direct Hit Failed for ${s.name} (Hijacked)!`);
-                //             }
-                //         } catch (e) {
-                //             console.log(`[DEBUG] ⚠️ Direct Hit Network Error on ${s.name}`);
-                //         }
-                //     }
-
-                //     // 🛑 যদি ডাইরেক্ট হিটে কাজ না হয় (বা আংশিক হয়), তাহলে আপনার লজিক অনুযায়ী ৬০ সেকেন্ডের রেস্ট নিয়ে Fallback করবে!
-                //     if (successfullyReserved.length < cfg.seats) {
-                //         console.log(`[DEBUG] 🛑 Blind Sniper missed target! Taking Tactical 60s Sleep before falling back to Normal Radar...`);
-                //         await delay(60000); 
-
-                //         // 🚀 ঘুম থেকে উঠে স্মার্ট পোলিং দিয়ে টোকেন ফ্রেশ করে নিচ্ছি
-                //         let fallbackExpiredToken = cftToken;
-                //         if (window.turnstile) { window.turnstile.reset(); }
-                        
-                //         for(let w = 0; w < 10; w++) {
-                //             await delay(1000);
-                //             let checkToken = document.querySelector('[name="cf-turnstile-response"]')?.value || window.localStorage.getItem('cf-turnstile-response') || "";
-                //             if (checkToken && checkToken !== fallbackExpiredToken) {
-                //                 cftToken = checkToken;
-                //                 window.localStorage.setItem('cf-turnstile-response', cftToken);
-                //                 break;
-                //             }
-                //         }
-                //         console.log(`[DEBUG] 🔋 Woke up! Shifting to Phase B (Normal Layout Radar)...`);
-                //     }
-                // }
 
                 // ==========================================
                 // 👻 PHASE B: SINGLE-PASS NINJA SCANNER (No fastExit)
@@ -261,11 +198,30 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                     }
 
                     try {
-                        const layoutRes = await fetch(`https://railspaapi.shohoz.com/v1.0/web/bookings/seat-layout?trip_id=${DYNAMIC_TRIP_ID}&trip_route_id=${DYNAMIC_ROUTE_ID}&cft_response=${cftToken}`, { headers: apiHeaders, cache: "no-store" });
+                        // 🚀 THE FIX: KILL-SWITCH FOR SEAT LAYOUT FETCH
+                        const controller = new AbortController();
+                        // ⏱️ ৩.৫ সেকেন্ডের বেশি ম্যাপ আনতে সময় লাগলে রিকোয়েস্ট কেটে দেবে!
+                        const timeoutId = setTimeout(() => controller.abort(), 3500); 
+
+                        const layoutRes = await fetch(`https://railspaapi.shohoz.com/v1.0/web/bookings/seat-layout?trip_id=${DYNAMIC_TRIP_ID}&trip_route_id=${DYNAMIC_ROUTE_ID}&cft_response=${cftToken}`, { 
+                            headers: apiHeaders, 
+                            cache: "no-store",
+                            signal: controller.signal // 👈 সিগন্যাল যুক্ত করা হলো
+                        });
+                        
+                        clearTimeout(timeoutId); // 🎯 ঠিকঠাক রেসপন্স পেলে টাইমার অফ করে দেবে
+
+                        // 🛑 THE 401 GUARD: লগইন এক্সপায়ার চেক
+                        if (layoutRes.status === 401) {
+                            console.log(`[DEBUG] 💀 FATAL: Your Main Login Token (Bearer) Expired!`);
+                            return { success: false, message: "⚠️ 401 Unauthorized! Please reload the Shohoz tab, login again, and restart the bot!" };
+                        }
+
                         const layoutATK = layoutRes.headers.get('x-action-token');
                         if (layoutATK) { actionToken = layoutATK; apiHeaders["x-action-token"] = layoutATK; window.sessionStorage.setItem('atk', layoutATK); }
                         
                         const layoutData = await layoutRes.json();
+
                         if (layoutData.error || !layoutData?.data?.seatLayout) {
                             console.log(`[DEBUG] ⚠️ Layout Fetch Failed. Server Response: ${JSON.stringify(layoutData)}`);
 
@@ -310,33 +266,6 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                             }
                             continue; 
                         }
-
-                        // 🛠️ TEMPORARY HACK: DOWNLOAD SEAT LAYOUT TO PC 🛠️
-// // (কাজ শেষ হলে এই ব্লকটুকু মুছে দেবেন)
-// if (!window.__layoutDownloaded) {
-//     try {
-//         const jsonString = JSON.stringify(layoutData, null, 2);
-//         const blob = new Blob([jsonString], { type: "application/json" });
-//         const url = URL.createObjectURL(blob);
-//         const a = document.createElement('a');
-//         a.href = url;
-        
-//         // ট্রেনের নামের সাথে মিলিয়ে ফাইলের নাম হবে
-//         let safeTrainName = cfg.trainName.replace(/[^a-zA-Z0-9]/g, '_'); 
-//         a.download = `${safeTrainName}_SeatLayout.json`;
-        
-//         document.body.appendChild(a);
-//         a.click();
-//         document.body.removeChild(a);
-//         URL.revokeObjectURL(url);
-        
-//         window.__layoutDownloaded = true; // যেন লুপে বারবার ডাউনলোড না হয়
-//         console.log(`[DEBUG] 📥 BINGO! SEAT LAYOUT SAVED TO YOUR DOWNLOADS FOLDER!`);
-//     } catch (e) {
-//         console.log(`[DEBUG] ⚠️ Failed to download layout: ${e.message}`);
-//     }
-// }
-// // 🛠️ END OF TEMPORARY HACK 🛠️
 
                         // ==========================================
                         // 👻 PHASE B: WHOLE MAP NINJA SCANNER (No fastExit)
@@ -416,46 +345,81 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                         // 🚀 RADAR TRACKER: আপনি নিজের চোখে দেখবেন সে কোন ৯টায় ফায়ার করছে!
                         console.log(`[DEBUG] 🔫 Arsenal loaded with ${targetSeats.length} bullet(s): [ ${targetSeats.map(s => s.name).join(', ')} ]`);
 
-                        // --- PHASE C: RESERVE (MICRO-OPTIMIZED FOR SPEED) ---
-                        
-                        // ⚡ স্পিড হ্যাক: লুপের বাইরে আগে থেকেই বডি তৈরি করে রাখা হচ্ছে
+                        // --- PHASE C: RESERVE (SAFE SEQUENTIAL WITH 2.5s KILL-SWITCH) ---
+
                         const basePayload = {
                             route_id: DYNAMIC_ROUTE_ID.toString(),
                             cft_response: cftToken,
                             extras: { origin_name: cfg.origin, destination_name: cfg.dest, trip_number: cfg.trainName }
                         };
                         let requestsFired = 0;
-
+                        
+                        // 🚀 টোকেন চেইন এবং ৪ সিটের এরর থেকে বাঁচতে আমরা এখন একটার পর একটা (Sequential) ফায়ার করব
                         for (let i = 0; i < targetSeats.length; i++) {
+                            // 🛑 THE HARD CAP: আমাদের কাঙ্ক্ষিত সিট (cfg.seats) পূর্ণ হয়ে গেলে লুপ সাথে সাথে ব্রেক!
                             if (successfullyReserved.length >= cfg.seats) break;
-
-                            // 🛑 Hard Cap: কোনোভাবেই যেন ৯টার বেশি রিকোয়েস্ট ফায়ার না হয়
                             if (requestsFired >= 9) break;
-
-                            // শুধু পরিবর্তনশীল ডেটাগুলো লুপের ভেতরে আপডেট হবে
+                        
                             basePayload.ticket_id = targetSeats[i].id.toString();
                             basePayload.action_token = actionToken;
                             basePayload.extras.seat_number = targetSeats[i].name;
-
-                            requestsFired++; // ফায়ার কাউন্ট বাড়ালাম
-                            const reserveRes = await fetch("https://railspaapi.shohoz.com/v1.0/web/bookings/reserve-seat", {
-                                method: "PATCH", headers: apiHeaders, 
-                                cache: "no-store",  // 🚀 THE SPEED HACK: কোনো ক্যাশ চেক ছাড়াই সরাসরি ডাটাবেসে আঘাত!
-                                body: JSON.stringify(basePayload) // ⚡ মিলি-সেকেন্ড সেভ হবে!
-                            });
+                        
+                            requestsFired++; 
                             
-                            const loopATK = reserveRes.headers.get('x-action-token');
-                            if (loopATK) { actionToken = loopATK; apiHeaders["x-action-token"] = loopATK; window.sessionStorage.setItem('atk', loopATK); }
+                            try {
+                                const controller = new AbortController();
+                                const timeoutId = setTimeout(() => controller.abort(), 2500); // ⏱️ ২.৫s কিল-সুইচ
                             
-                            const reserveData = await reserveRes.json();
-                            
-                            if (reserveData.error) {
-                                console.log(`[DEBUG] ⚔️ Seat ${targetSeats[i].name} hijacked! Moving on...`);
+                                // ⚡ প্রতিটি রিকোয়েস্টের রেসপন্সের জন্য আমরা লুপের ভেতরেই await করব
+                                const reserveRes = await fetch("https://railspaapi.shohoz.com/v1.0/web/bookings/reserve-seat", {
+                                    method: "PATCH", headers: apiHeaders, 
+                                    cache: "no-store",  
+                                    signal: controller.signal, 
+                                    body: JSON.stringify(basePayload) 
+                                });
+                                
+                                clearTimeout(timeoutId); // 🎯 ঠিকঠাক রেসপন্স পেলে টাইমার অফ
+                                
+                                // ⚡ নতুন অ্যাকশন টোকেন হেডার থেকে নিয়ে পকেটে ভরে নিলাম (টোকেন চেইন অক্ষত রইল)
+                                const loopATK = reserveRes.headers.get('x-action-token');
+                                if (loopATK) { actionToken = loopATK; apiHeaders["x-action-token"] = loopATK; window.sessionStorage.setItem('atk', loopATK); }
+                                
+                                // ⚡ বডি সাথে সাথে পার্স করে শিওর হচ্ছি সিটটা পেলাম কি না
+                                const reserveData = await reserveRes.json();
+                                
+                                if (reserveData.error) {
+                                    // 🛑 THE ERROR GUARD: যদি সার্ভার বলে ফেলে যে ৪টার বেশি সিট কাটা যাবে না!
+                                    if (JSON.stringify(reserveData.error).includes("Maximum 4 seats")) {
+                                        console.log(`[DEBUG] 🛑 Backend says Max 4 seats reached! Halting fire and moving to payment...`);
+                                        break; // আর কোনো রিকোয়েস্ট পাঠাবে না, লুপ ভেঙে সোজা পেমেন্টে চলে যাবে!
+                                    }
+                                    
+                                    console.log(`[DEBUG] ⚔️ Seat ${targetSeats[i].name} hijacked or failed! Moving on...`);
+                                    continue; 
+                                } else {
+                                    successfullyReserved.push(targetSeats[i]);
+                                    if (!firstSeatLockTime) firstSeatLockTime = Date.now();
+                                    console.log(`[DEBUG] 🎯 Locked: ${targetSeats[i].name}. Total: ${successfullyReserved.length}/${cfg.seats}`);
+                                }
+                            } catch (e) {
+                                if (e.name === 'AbortError') {
+                                    console.log(`[DEBUG] ⚠️ Booking hung for > 2.5s on ${targetSeats[i].name}! Aborting and rushing to next seat...`);
+                                } else {
+                                    console.log(`[DEBUG] ⚠️ Network error on ${targetSeats[i].name}! Moving on...`);
+                                }
                                 continue; 
-                            } else {
-                                successfullyReserved.push(targetSeats[i]);
+                            }
+                        }
+
+                        // 🚀 ফায়ারিং শেষ! এবার ব্যাকগ্রাউন্ডে পার্স হওয়া JSON গুলোর রেজাল্ট একসাথে চেক করব
+                        let bookingResults = await Promise.all(jsonParsingTasks);
+                        for (let res of bookingResults) {
+                            if (!res.data.error) {
+                                successfullyReserved.push(res.seat);
                                 if (!firstSeatLockTime) firstSeatLockTime = Date.now();
-                                console.log(`[DEBUG] 🎯 Locked: ${targetSeats[i].name}. Total: ${successfullyReserved.length}/${cfg.seats}`);
+                                console.log(`[DEBUG] 🎯 Locked: ${res.seat.name}. Total: ${successfullyReserved.length}/${cfg.seats}`);
+                            } else {
+                                console.log(`[DEBUG] ⚔️ Seat ${res.seat.name} hijacked!`);
                             }
                         }
 
@@ -517,6 +481,12 @@ module.exports = async function runApiBot(config, sendLog, abortSignal, requestO
                         }
 
                     } catch (error) {
+                        // 🚀 THE MAGIC RETRY: যদি ৩.৫ সেকেন্ড পার হওয়ার কারণে রিকোয়েস্ট কিল হয়
+                        if (error.name === 'AbortError') {
+                            console.log(`[DEBUG] ⚠️ Server hung for > 3.5s while fetching Map! Aborting and Re-firing instantly...`);
+                            continue; // ⚡ কোনো ওয়েট না করে ডাইরেক্ট আবার ফায়ার!
+                        }
+
                         console.log(`[DEBUG] Network blip, surviving...`);
                         await delay(3000);
                     }
