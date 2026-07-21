@@ -175,7 +175,7 @@ ipcMain.on('start-api-node', (event, config) => {
         } 
         else if (msg.type === 'NEED_OTP') {
             // Signal the UI to show the OTP Box for this specific port
-            event.reply('need-otp', msg.port);
+            event.reply('need-otp', { port: msg.port, phone: msg.phone });
         } 
         else if (msg.type === 'DONE' || msg.type === 'ERROR') {
             if (msg.type === 'ERROR') {

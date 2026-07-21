@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminator Fleet - User Manual</title>
+    <style>
+        body { background-color: #0a0a0c; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 25px; line-height: 1.6; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00e676; }
+
+        h1 { color: #00e676; border-bottom: 1px dashed #333; padding-bottom: 10px; margin-top: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px;}
+        h2 { color: #bb86fc; font-size: 18px; margin-top: 25px; }
+        
+        .alert-box { background: #2a1a00; border: 1px dashed #ff9800; padding: 15px; border-radius: 6px; color: #ffb74d; margin-bottom: 20px; font-weight: bold; }
+        
+        ul { background: #111; border: 1px solid #222; border-radius: 8px; padding: 20px 20px 20px 40px; margin: 0; }
+        li { margin-bottom: 12px; }
+        li strong { color: #fff; }
+        
+        .code-hl { background: #222; color: #00e676; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; border: 1px solid #333; }
+        
+        .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; border-top: 1px solid #222; padding-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <h1>📖 বট ব্যবহারের এ-টু-জেড নির্দেশিকা</h1>
+    
+    <div class="alert-box">
+        ⚠️ সতর্কবার্তা: বটের ইনপুট বক্সে কোনো বানান ভুল বা স্পেস ভুল হলে বট কাজ করবে না! তাই ওয়েবসাইট থেকে হুবহু কপি করে বক্সে বসানো সবচেয়ে নিরাপদ।
+    </div>
+
+    <h2>ধাপ ১: ব্রাউজার ওপেন ও লগইন</h2>
+    <ul>
+        <li>প্রথমে বটের প্যানেল থেকে কালো বক্সের কোডটিতে (যেমন: <span class="code-hl">chrome.exe --remote-debugging...</span>) ক্লিক করে কপি করুন।</li>
+        <li>আপনার পিসির <strong>Run</strong> (Win + R) ওপেন করে কোডটি পেস্ট করে এন্টার দিন।</li>
+        <li>একটি নতুন Chrome ব্রাউজার ওপেন হবে। সেখানে <span class="code-hl">eticket.railway.gov.bd</span> সাইটে গিয়ে আপনার অ্যাকাউন্টে লগইন করুন।</li>
+    </ul>
+
+    <h2>ধাপ ২: সঠিক ট্রেনের পেজে যাওয়া (খুবই জরুরি)</h2>
+    <ul>
+        <li>লগইন করার পর, ব্রাউজারে <strong>From</strong>, <strong>To</strong> এবং <strong>Date</strong> সিলেক্ট করে "Search Trains" বাটনে ক্লিক করুন।</li>
+        <li>যে ট্রেনের টিকিট কাটতে চান, সেই পেজটি চোখের সামনে ওপেন করে রাখুন (বট যেন সেখান থেকে ডাটা মেলাতে পারে)।</li>
+    </ul>
+
+    <h2>ধাপ ৩: হুবহু ডেটা ইনপুট দেওয়া (Master Matching)</h2>
+    <ul>
+        <li><strong>Origin ও Destination:</strong> ব্রাউজারের সার্চ বক্সে যেভাবে লেখা আছে ঠিক সেভাবেই লিখতে হবে। যেমন ঢাকা হলে <span class="code-hl">Dhaka</span> (D বড় হাতের), জামালপুর হলে <span class="code-hl">Jamalpur_Town</span> (মাঝে আন্ডারস্কোর থাকলে অবশ্যই দিতে হবে)।</li>
+        <li><strong>Journey Date:</strong> ক্যালেন্ডার আইকনে ক্লিক করে সিলেক্ট করুন অথবা হুবহু <span class="code-hl">27-Jul-2026</span> ফরম্যাটে লিখুন।</li>
+        <li><strong>Train Name:</strong> ওয়েবসাইটের ট্রেনের নাম আর নম্বর হুবহু কপি করে পেস্ট করুন। যেমন: <span class="code-hl">TISTA EXPRESS (707)</span>।</li>
+        <li><strong>Class:</strong> সিটের ক্লাস হুবহু লিখতে হবে। যেমন: <span class="code-hl">S_CHAIR</span>, <span class="code-hl">SNIGDHA</span>, বা <span class="code-hl">AC_B</span>।</li>
+    </ul>
+
+    <h2>ধাপ ৪: বট চালু ও সিট কনফার্মেশন</h2>
+    <ul>
+        <li>সব ডেটা ঠিক থাকলে <strong>"▶ START"</strong> বাটনে ক্লিক করুন।</li>
+        <li>বট সিট খুঁজে লক করা মাত্রই আপনার ফোনে OTP যাবে এবং বটের প্যানেলে OTP বসানোর বক্স আসবে।</li>
+        <li>দ্রুত OTP কোড বসিয়ে <strong>SUBMIT</strong> দিন।</li>
+        <li>সিস্টেম নিজে থেকেই পেমেন্ট পেজে চলে যাবে। আপনি শুধু বিকাশ/নগদ পিন দিয়ে পেমেন্ট সম্পন্ন করবেন!</li>
+    </ul>
+
+    <div class="footer">
+        Developed for High-Speed API Sniping | Terminator Fleet Architecture
+    </div>
+
+</body>
+</html>

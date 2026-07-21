@@ -1,6 +1,6 @@
 {
   "name": "ticketbot-pro",
-  "version": "5.0.0",
+  "version": "5.1.1",
   "description": "Multi-Account Ticketing Control Panel",
   "author": "Nur Hossain",
   "main": "main.js",

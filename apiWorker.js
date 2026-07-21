@@ -25,9 +25,9 @@ process.on('message', async (message) => {
         };
 
         // এই ফাংশনটা bot.js কল করবে যখন তার OTP লাগবে
-        const requestOtp = () => {
+        const requestOtp = (phone) => {
             // UI কে সিগন্যাল দাও যে OTP বক্স দেখাও
-            process.send({ type: 'NEED_OTP', port: config.port });
+            process.send({ type: 'NEED_OTP', port: config.port, phone: phone || "Unknown" });
             
             // একটি প্রমিজ রিটার্ন করো, যেটা UI থেকে OTP না আসা পর্যন্ত আটকে থাকবে
             return new Promise((resolve) => {
